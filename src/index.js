@@ -4,10 +4,7 @@ import uploadImages from "./routes/ticket-screenshots.routes.js";
 
 const app = express();
 
-const allowedOrigins = [
-  "http://localhost:4173",
-];
-
+const allowedOrigins = ["http://localhost:4173", "*"];
 
 app.use(
   cors({
@@ -19,6 +16,5 @@ app.use(
 app.use(express.json());
 
 app.use("/", uploadImages);
-
 
 export default app;

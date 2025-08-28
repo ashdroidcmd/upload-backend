@@ -1,6 +1,7 @@
 import multer from "multer";
 import { Client } from "minio";
 import dotenv from "dotenv";
+import sharp from "sharp"; // image processing library to webp
 
 dotenv.config();
 
@@ -14,68 +15,47 @@ const minioClient = new Client({
   secretKey: process.env.SECRET_KEY,
 });
 
-// Bucket Name
-const bucketName = process.env.BUCKET_NAME;
+// Helper: Unique Filename Generator
+function generateUniqueFileName(originalName) {
+  const now = new Date();
+  const pad = (n) => n.toString().padStart(2, "0");
+  const dateTime = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(
+    now.getDate()
+  )}-${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`;
 
-// Helper to map type → folder
-function getFolder(type) {
-  switch (type) {
-    case "avatar":
-      return "avatars";
-    case "screenshot":
-      return "tickets";
-    case "post":
-      return "posts";
-    default:
-      return "misc";
-  }
+  return `${dateTime}-${originalName.split(".")[0]}.webp`;
 }
 
-// ✅ Upload file
+// Upload Single File
 export const uploadFile = async (req, res) => {
   try {
     const file = req.file;
-    const { type } = req.params;
+    const { bucket, type } = req.params;
 
-    // If no File is uploaded
     if (!file) {
-      console.error("❌ No file received");
       return res.status(400).send("No file uploaded");
     }
 
-    // console.log("📥 Uploading file:", file.originalname, "->", type);
+    // Convert to WebP
+    const webpBuffer = await sharp(file.buffer).webp({ quality: 80 }).toBuffer();
 
-    const metaData = { "Content-Type": file.mimetype };
-
-    // Unique filename generation Date and Time
-    const now = new Date();
-
-    // Helper to pad numbers (e.g. 8 → 08)
-    const pad = (n) => n.toString().padStart(2, "0");
-
-    // Local time formatted filename
-    const dateTime = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(
-      now.getDate()
-    )}-${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(
-      now.getSeconds()
-    )}`;
-
-    const uniqueFileName = `${dateTime}-${file.originalname}`;
+    const uniqueFileName = generateUniqueFileName(file.originalname);
 
     // Upload to MinIO
     await minioClient.putObject(
-      bucketName,
+      bucket,
       `${type}/${uniqueFileName}`,
-      file.buffer,
-      file.size,
-      metaData
+      webpBuffer,
+      webpBuffer.length,
+      { "Content-Type": "image/webp" }
     );
 
-    // JSON response with file details
     res.json({
-      message: "✅ File uploaded successfully",
-      filename: file.originalname,
-      url: `https://s3.acemcbohol.dev/${bucketName}/${type}/${uniqueFileName}`,
+      message: "✅ File uploaded successfully (converted to WebP)",
+      bucket,
+      original: file.originalname,
+      converted: uniqueFileName,
+      url: `https://${process.env.ENDPOINT}/${bucket}/${type}/${uniqueFileName}`,
     });
   } catch (err) {
     console.error("❌ Upload error:", err);
@@ -83,50 +63,40 @@ export const uploadFile = async (req, res) => {
   }
 };
 
-// uploadMultipleFiles
+// Upload Multiple Files
 export const uploadFiles = async (req, res) => {
   try {
-    const files = req.files; // multer gives an array here
-    const { type } = req.params;
+    const files = req.files;
+    const { bucket, type } = req.params;
 
     if (!files || files.length === 0) {
-      console.error("❌ No files received");
       return res.status(400).send("No files uploaded");
     }
 
     const uploadedFiles = [];
 
     for (const file of files) {
-      const metaData = { "Content-Type": file.mimetype };
+      const webpBuffer = await sharp(file.buffer).webp({ quality: 80 }).toBuffer();
+      const uniqueFileName = generateUniqueFileName(file.originalname);
 
-      // Unique filename generation
-      const now = new Date();
-      const pad = (n) => n.toString().padStart(2, "0");
-      const dateTime = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(
-        now.getDate()
-      )}-${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(
-        now.getSeconds()
-      )}`;
-
-      const uniqueFileName = `${dateTime}-${file.originalname}`;
-
-      // Upload each file to MinIO
       await minioClient.putObject(
-        bucketName,
+        bucket,
         `${type}/${uniqueFileName}`,
-        file.buffer,
-        file.size,
-        metaData
+        webpBuffer,
+        webpBuffer.length,
+        { "Content-Type": "image/webp" }
       );
 
       uploadedFiles.push({
-        filename: file.originalname,
-        url: `https://s3.acemcbohol.dev/${bucketName}/${type}/${uniqueFileName}`,
+        original: file.originalname,
+        converted: uniqueFileName,
+        url: `https://${process.env.ENDPOINT}/${bucket}/${type}/${uniqueFileName}`,
       });
     }
 
     res.json({
-      message: "✅ Files uploaded successfully",
+      message: "✅ Files uploaded successfully (converted to WebP)",
+      bucket,
       files: uploadedFiles,
     });
   } catch (err) {
@@ -135,7 +105,7 @@ export const uploadFiles = async (req, res) => {
   }
 };
 
-// Get file
+// ----------------- Get File -----------------
 export const getFile = async (req, res) => {
   const { bucket, folder, filename } = req.params;
 
@@ -159,4 +129,28 @@ export const getFile = async (req, res) => {
       res.status(500).json({ error: "Error streaming file" });
     });
   });
+};
+
+// Delete File 
+export const deleteFile = async (req, res) => {
+  try {
+    const { bucket, folder, filename } = req.params;
+
+    if (!bucket || !folder || !filename) {
+      return res.status(400).json({ error: "Missing required parameters" });
+    }
+
+    const objectName = `${folder}/${filename}`;
+
+    await minioClient.removeObject(bucket, objectName);
+
+    res.json({
+      message: "🗑️ File deleted successfully",
+      bucket,
+      object: objectName,
+    });
+  } catch (err) {
+    console.error("❌ Delete error:", err);
+    res.status(500).json({ error: "Delete failed", details: err.message });
+  }
 };

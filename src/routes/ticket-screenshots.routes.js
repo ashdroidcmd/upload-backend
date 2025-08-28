@@ -2,24 +2,24 @@ import express from "express";
 import multer from "multer";
 import {
   uploadFile,
-  getFile,
   uploadFiles,
+  getFile,
+  deleteFile,
 } from "../controllers/ticket-screenshots.controllers.js";
 
-// Setup multer
 const upload = multer({ storage: multer.memoryStorage() });
-
 const router = express.Router();
 
-// Upload route (POST + multer middleware)
-router.post("/upload/:type", upload.single("file"), uploadFile); 
+// Single upload
+router.post("/upload/:bucket/:type", upload.single("file"), uploadFile);
 
-// Multiple files (posts with many images)
-router.post("/upload-multiple/:type", upload.array("files", 15), uploadFiles);
+// Multiple upload
+router.post("/upload-multiple/:bucket/:type", upload.array("files", 30), uploadFiles);
 
-// Get route (GET by filename)
+// Get file
 router.get("/files/:bucket/:folder/:filename", getFile);
 
-// Delete by File
+// Delete file
+router.delete("/files/:bucket/:folder/:filename", deleteFile);
 
 export default router;
