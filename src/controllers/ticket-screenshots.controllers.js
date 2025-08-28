@@ -83,6 +83,7 @@ export const uploadFile = async (req, res) => {
   }
 };
 
+// uploadMultipleFiles
 export const uploadFiles = async (req, res) => {
   try {
     const files = req.files; // multer gives an array here
@@ -134,7 +135,7 @@ export const uploadFiles = async (req, res) => {
   }
 };
 
-// ✅ Get file
+// Get file
 export const getFile = async (req, res) => {
   const { bucket, folder, filename } = req.params;
 

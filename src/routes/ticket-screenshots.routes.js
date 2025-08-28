@@ -20,4 +20,6 @@ router.post("/upload-multiple/:type", upload.array("files", 15), uploadFiles);
 // Get route (GET by filename)
 router.get("/files/:bucket/:folder/:filename", getFile);
 
+// Delete by File
+
 export default router;
