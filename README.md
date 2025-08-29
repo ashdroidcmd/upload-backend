@@ -1,4 +1,3 @@
-# minio-test
 # MinIO File Upload API
 
 ### Libraries
