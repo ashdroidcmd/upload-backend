@@ -5,6 +5,7 @@ import {
   uploadFiles,
   getFile,
   deleteFile,
+  deleteFiles,
 } from "../controllers/ticket-screenshots.controllers.js";
 
 const upload = multer({ storage: multer.memoryStorage() });
@@ -14,7 +15,11 @@ const router = express.Router();
 router.post("/upload/:bucket/:type", upload.single("file"), uploadFile);
 
 // Multiple upload
-router.post("/upload-multiple/:bucket/:type", upload.array("files", 30), uploadFiles);
+router.post(
+  "/upload-multiple/:bucket/:type",
+  upload.array("files", 30),
+  uploadFiles
+);
 
 // Get file
 router.get("/files/:bucket/:folder/:filename", getFile);

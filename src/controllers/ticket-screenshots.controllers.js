@@ -36,27 +36,37 @@ export const uploadFile = async (req, res) => {
       return res.status(400).send("No file uploaded");
     }
 
-    // Convert to WebP
-    const webpBuffer = await sharp(file.buffer)
-      .webp({ quality: 80 })
-      .toBuffer();
+    let buffer;
+    let uniqueFileName;
+    let contentType;
 
-    const uniqueFileName = generateUniqueFileName(file.originalname);
+    if (file.mimetype.startsWith("image/")) {
+      // Convert images to WebP
+      buffer = await sharp(file.buffer).webp({ quality: 80 }).toBuffer();
+      uniqueFileName = generateUniqueFileName(file.originalname);
+      contentType = "image/webp";
+    } else {
+      // Keep other files (PDF, DOCX, etc.) as-is
+      buffer = file.buffer;
+      uniqueFileName = `${Date.now()}-${file.originalname}`;
+      contentType = file.mimetype; // keep correct mimetype
+    }
 
     // Upload to MinIO
     await minioClient.putObject(
       bucket,
       `${type}/${uniqueFileName}`,
-      webpBuffer,
-      webpBuffer.length,
-      { "Content-Type": "image/webp" }
+      buffer,
+      buffer.length,
+      { "Content-Type": contentType }
     );
 
     res.json({
-      message: "✅ File uploaded successfully (converted to WebP)",
+      message: "✅ File uploaded successfully",
       bucket,
       original: file.originalname,
-      converted: uniqueFileName,
+      storedAs: uniqueFileName,
+      type: file.mimetype,
       url: `https://${process.env.ENDPOINT}/${bucket}/${type}/${uniqueFileName}`,
     });
   } catch (err) {
@@ -78,30 +88,38 @@ export const uploadFiles = async (req, res) => {
     const uploadedFiles = [];
 
     for (const file of files) {
-      // Convert to Webp
-      const webpBuffer = await sharp(file.buffer)
-        .webp({ quality: 80 })
-        .toBuffer();
-      const uniqueFileName = generateUniqueFileName(file.originalname);
+      let buffer;
+      let uniqueFileName;
+      let contentType;
 
-      // Upload to Minio
+      if (file.mimetype.startsWith("image/")) {
+        buffer = await sharp(file.buffer).webp({ quality: 80 }).toBuffer();
+        uniqueFileName = generateUniqueFileName(file.originalname);
+        contentType = "image/webp";
+      } else {
+        buffer = file.buffer;
+        uniqueFileName = `${Date.now()}-${file.originalname}`;
+        contentType = file.mimetype;
+      }
+
       await minioClient.putObject(
         bucket,
         `${type}/${uniqueFileName}`,
-        webpBuffer,
-        webpBuffer.length,
-        { "Content-Type": "image/webp" }
+        buffer,
+        buffer.length,
+        { "Content-Type": contentType }
       );
 
       uploadedFiles.push({
         original: file.originalname,
-        converted: uniqueFileName,
+        storedAs: uniqueFileName,
+        type: file.mimetype,
         url: `https://${process.env.ENDPOINT}/${bucket}/${type}/${uniqueFileName}`,
       });
     }
 
     res.json({
-      message: "✅ Files uploaded successfully (converted to WebP)",
+      message: "✅ Files uploaded successfully",
       bucket,
       files: uploadedFiles,
     });
