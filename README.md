@@ -26,7 +26,7 @@ yarn install
 ### Create a `.env` file with the following variables
 
 ```env
-ENDPOINT=s3.acemcbohol.dev
+ENDPOINT=your-endpoint-url
 ACCESS_KEY=your-access-key
 SECRET_KEY=your-secret-key
 PORT=3002
