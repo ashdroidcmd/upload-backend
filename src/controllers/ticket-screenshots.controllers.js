@@ -37,7 +37,9 @@ export const uploadFile = async (req, res) => {
     }
 
     // Convert to WebP
-    const webpBuffer = await sharp(file.buffer).webp({ quality: 80 }).toBuffer();
+    const webpBuffer = await sharp(file.buffer)
+      .webp({ quality: 80 })
+      .toBuffer();
 
     const uniqueFileName = generateUniqueFileName(file.originalname);
 
@@ -76,9 +78,13 @@ export const uploadFiles = async (req, res) => {
     const uploadedFiles = [];
 
     for (const file of files) {
-      const webpBuffer = await sharp(file.buffer).webp({ quality: 80 }).toBuffer();
+      // Convert to Webp
+      const webpBuffer = await sharp(file.buffer)
+        .webp({ quality: 80 })
+        .toBuffer();
       const uniqueFileName = generateUniqueFileName(file.originalname);
 
+      // Upload to Minio
       await minioClient.putObject(
         bucket,
         `${type}/${uniqueFileName}`,
@@ -105,7 +111,7 @@ export const uploadFiles = async (req, res) => {
   }
 };
 
-// ----------------- Get File -----------------
+//  Get File
 export const getFile = async (req, res) => {
   const { bucket, folder, filename } = req.params;
 
@@ -131,7 +137,7 @@ export const getFile = async (req, res) => {
   });
 };
 
-// Delete File 
+// Delete File
 export const deleteFile = async (req, res) => {
   try {
     const { bucket, folder, filename } = req.params;
@@ -151,6 +157,40 @@ export const deleteFile = async (req, res) => {
     });
   } catch (err) {
     console.error("❌ Delete error:", err);
+    res.status(500).json({ error: "Delete failed", details: err.message });
+  }
+};
+
+// Delete multiple files
+export const deleteFiles = async (req, res) => {
+  try {
+    const { bucket, folder, filenames } = req.body;
+
+    if (!bucket || !folder || !filenames || !Array.isArray(filenames)) {
+      return res
+        .status(400)
+        .json({ error: "bucket, folder, and filenames[] are required" });
+    }
+
+    const results = [];
+
+    for (const filename of filenames) {
+      const objectName = `${folder}/${filename}`;
+      try {
+        await minioClient.removeObject(bucket, objectName);
+        results.push({ filename, status: "deleted" });
+      } catch (err) {
+        console.error("❌ Error deleting:", filename, err.message);
+        results.push({ filename, status: "error", error: err.message });
+      }
+    }
+
+    res.json({
+      message: "🗑️ Delete operation completed",
+      results,
+    });
+  } catch (err) {
+    console.error("❌ Delete multiple error:", err);
     res.status(500).json({ error: "Delete failed", details: err.message });
   }
 };

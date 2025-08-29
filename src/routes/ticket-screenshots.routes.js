@@ -22,4 +22,7 @@ router.get("/files/:bucket/:folder/:filename", getFile);
 // Delete file
 router.delete("/files/:bucket/:folder/:filename", deleteFile);
 
+// Multiple Delete
+router.delete("/files/delete-multiple", deleteFiles);
+
 export default router;
